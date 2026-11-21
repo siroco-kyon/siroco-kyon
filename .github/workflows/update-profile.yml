@@ -1,0 +1,61 @@
+name: Update profile images
+
+on:
+  schedule:
+    - cron: "17 18 * * *" # 毎日 03:17 JST
+  workflow_dispatch: # Actions タブから手動実行もできる
+  push: # このファイルを push したときにも1回走らせる（初回生成用）
+    branches: [main]
+    paths:
+      - .github/workflows/update-profile.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-profile
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # 1つ失敗しても残りは更新できるように continue-on-error にしている
+      - name: Generate stats card
+        continue-on-error: true
+        uses: stats-organization/github-readme-stats-action@v2
+        with:
+          card: stats
+          options: username=${{ github.repository_owner }}&show_icons=true&theme=github_dark&title_color=39d353&icon_color=26a641&border_color=30363d
+          path: profile/stats.svg
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_error: "true"
+
+      - name: Generate top languages card
+        continue-on-error: true
+        uses: stats-organization/github-readme-stats-action@v2
+        with:
+          card: top-langs
+          options: username=${{ github.repository_owner }}&layout=compact&langs_count=6&theme=github_dark&title_color=39d353&border_color=30363d
+          path: profile/top-langs.svg
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_error: "true"
+
+      - name: Generate 3D contribution graph
+        continue-on-error: true
+        uses: yoshi389111/github-profile-3d-contrib@v0.9.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          USERNAME: ${{ github.repository_owner }}
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profile
+          if [ -d profile-3d-contrib ]; then git add profile-3d-contrib; fi
+          git commit -m "Update profile images" || exit 0
+          git pull --rebase
+          git push
